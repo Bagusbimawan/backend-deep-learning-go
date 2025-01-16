@@ -10,4 +10,5 @@ func UserRoute(app *fiber.App) {
 	api := app.Group("/api")
 	api.Post("/register", controller.Register)
 	api.Post("/login", controller.Login)
+	api.Post("/logout", controller.Logout)
 }
