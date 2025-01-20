@@ -11,4 +11,7 @@ func UserRoute(app *fiber.App) {
 	api.Post("/register", controller.Register)
 	api.Post("/login", controller.Login)
 	api.Post("/logout", controller.Logout)
+	api.Get("/user/:id", controller.GetUserByID)
+	api.Put("/user/:id", controller.UpdateUserByID)
+	api.Delete("/user/:id", controller.DeleteUserByID)
 }
