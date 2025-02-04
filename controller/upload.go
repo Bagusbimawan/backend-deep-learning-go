@@ -40,28 +40,37 @@ func UploadFile(file *multipart.FileHeader) (string, error) {
 
 // UploadHandler handles the file upload request
 func UploadHandler(c *fiber.Ctx) error {
+	// Check for token in headers
+	token := c.Get("Authorization")
+	if token == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"status":  false,
+			"message": "missing token",
+		})
+	}
+
 	// Get the file from the form
 	file, err := c.FormFile("file")
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-            "status":false,
-            "message":"failed get file ",
-
-        })
+			"status":  false,
+			"message": "failed get file",
+		})
 	}
 
 	// Call the UploadFile function
 	url, err := UploadFile(file)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "status":false,
-            "message":"failed upload file",
-        })
+			"status":  false,
+			"message": "failed upload file",
+		})
 	}
 
 	// Return the URL of the uploaded file
 	return c.JSON(fiber.Map{
-        "message":"upload succes",
-        "status":true,
-        "url": url})
+		"message": "upload success",
+		"status":  true,
+		"url":     url,
+	})
 }
