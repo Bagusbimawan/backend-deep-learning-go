@@ -9,6 +9,7 @@ import (
 func UserRoute(app *fiber.App) {
 	api := app.Group("/api")
 	api.Post("/register", controller.Register)
+	api.Post("/upload", controller.UploadHandler)
 	api.Post("/login", controller.Login)
 	api.Post("/logout", controller.Logout)
 	api.Get("/user/:id", controller.GetUserByID)
