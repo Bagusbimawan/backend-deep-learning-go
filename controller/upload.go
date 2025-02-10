@@ -3,10 +3,12 @@ package controller
 import (
 	"context"
 	"mime/multipart"
+	"os"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
 )
 
 var (
@@ -15,21 +17,36 @@ var (
 )
 
 func init() {
-	cld, _ = cloudinary.NewFromURL("cloudinary://771751577675731:H2stYwBW_gmdVXz6GAhrUzuarfg@dicczwwuo")
+	// Load .env file
+	err := godotenv.Load()
+	if err != nil {
+		panic("Error loading .env file")
+	}
+
+	cloudinaryURL := os.Getenv("CLOUDINARY_URL")
+	if cloudinaryURL == "" {
+		panic("CLOUDINARY_URL not set in environment")
+	}
+
+	var err2 error
+	cld, err2 = cloudinary.NewFromURL(cloudinaryURL)
+	if err2 != nil {
+		panic("Failed to initialize Cloudinary: " + err2.Error())
+	}
 }
 
-// UploadFile mengunggah file ke Cloudinary
+// UploadFile uploads a file to Cloudinary
 func UploadFile(file *multipart.FileHeader) (string, error) {
-	// Buka file yang akan diupload
+	// Open the file to be uploaded
 	src, err := file.Open()
 	if err != nil {
 		return "", err
 	}
 	defer src.Close()
 
-	// Upload file ke Cloudinary
+	// Upload file to Cloudinary
 	uploadResult, err := cld.Upload.Upload(ctx, src, uploader.UploadParams{
-		Folder: "go-uploads", // Folder di Cloudinary
+		Folder: "go-uploads",
 	})
 	if err != nil {
 		return "", err
@@ -45,7 +62,7 @@ func UploadHandler(c *fiber.Ctx) error {
 	if token == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"status":  false,
-			"message": "missing token",
+			"message": "Missing authorization token",
 		})
 	}
 
@@ -54,7 +71,7 @@ func UploadHandler(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  false,
-			"message": "failed get file",
+			"message": "Failed to get file from request",
 		})
 	}
 
@@ -63,13 +80,13 @@ func UploadHandler(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  false,
-			"message": "failed upload file",
+			"message": "Failed to upload file to storage",
 		})
 	}
 
 	// Return the URL of the uploaded file
-	return c.JSON(fiber.Map{
-		"message": "upload success",
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "File uploaded successfully",
 		"status":  true,
 		"url":     url,
 	})
