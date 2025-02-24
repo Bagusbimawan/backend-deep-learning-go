@@ -22,14 +22,14 @@ func Register(c *fiber.Ctx) error {
 	// Check if username contains spaces
 	if strings.Contains(user.Username, " ") {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Username cannot contain spaces",
+			"message": "Username cannot contain spaces",
 		})
 	}
 
 	// Check if password length is at least 8 characters
 	if len(user.Password) < 8 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Password must be at least 8 characters",
+			"message": "Password must be at least 8 characters",
 		})
 	}
 
@@ -37,7 +37,7 @@ func Register(c *fiber.Ctx) error {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to encrypt password",
+			"message": "Failed to encrypt password",
 		})
 	}
 	user.Password = string(hashedPassword)
@@ -45,13 +45,13 @@ func Register(c *fiber.Ctx) error {
 	var existingUser model.User
 	if err := database.DB.Where("username = ?", user.Username).First(&existingUser).Error; err == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Username is already taken",
+			"message": "Username is already taken",
 		})
 	}
 
 	if err := database.DB.Create(&user).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to create user",
+			"message": "Failed to create user",
 		})
 	}
 

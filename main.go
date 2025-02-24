@@ -12,7 +12,7 @@ func main() {
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*", // Allow requests from any origin
-		AllowHeaders: "origin, content-type, accept",
+		AllowHeaders: "origin, content-type, accept, Authorization",
 	}))
 
 	database.Database()
