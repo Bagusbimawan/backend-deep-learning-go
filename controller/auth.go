@@ -73,39 +73,39 @@ func Login(c *fiber.Ctx) error {
 	// Validate username
 	if loginRequest.Username == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Username cannot be empty",
+			"message": "Username cannot be empty",
 		})
 	}
 
 	if strings.Contains(loginRequest.Username, " ") {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Username cannot contain spaces",
+			"message": "Username cannot contain spaces",
 		})
 	}
 
 	// Validate password
 	if loginRequest.Password == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Password cannot be empty",
+			"message": "Password cannot be empty",
 		})
 	}
 
 	if len(loginRequest.Password) < 8 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Password must be at least 8 characters",
+			"message": "Password must be at least 8 characters",
 		})
 	}
 
 	var user model.User
 	if err := database.DB.Where("username = ?", loginRequest.Username).First(&user).Error; err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid username or password",
+			"message": "User not found",
 		})
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginRequest.Password)); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid username or password",
+			"message": "Invalid username or password",
 		})
 	}
 
@@ -133,5 +133,30 @@ func Login(c *fiber.Ctx) error {
 		"status":  fiber.StatusOK,
 		"data":    user,
 		"token":   tokenString,
+	})
+}
+
+func Logout(c *fiber.Ctx) error {
+
+	// Get token from header
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "No token provided",
+		})
+	}
+
+	// Clear the JWT token cookie
+	c.ClearCookie("jwt")
+
+	// Remove the token from the request context
+	c.Locals("user", nil)
+
+	// Clear Authorization header
+	c.Request().Header.Del("Authorization")
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Logout successful",
+		"status":  fiber.StatusOK,
 	})
 }

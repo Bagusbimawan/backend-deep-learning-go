@@ -8,7 +8,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -69,49 +68,31 @@ func UpdateUserByID(c *fiber.Ctx) error {
 		})
 	}
 
-	var updateData model.User
+	var updateData struct {
+		Phone string `json:"phone"`
+	}
+
 	if err := c.BodyParser(&updateData); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
+			"error¥": err.Error(),
 		})
 	}
 
-	// Check if username contains spaces
-	if strings.Contains(updateData.Username, " ") {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Username cannot contain spaces",
-		})
-	}
-
-	// Check if username is being changed and is already taken
-	if updateData.Username != "" && updateData.Username != user.Username {
+	// Validate phone number if it's being updated
+	if updateData.Phone != "" {
+		// Check if phone number is already taken
 		var existingUser model.User
-		if err := database.DB.Where("username = ?", updateData.Username).First(&existingUser).Error; err == nil {
+		if err := database.DB.Where("phone = ? AND id != ?", updateData.Phone, user.ID).First(&existingUser).Error; err == nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Username is already taken",
+				"error": "Phone number is already taken",
 			})
 		}
 	}
 
-	// Hash the password if it's being updated
-	if updateData.Password != "" {
-		if len(updateData.Password) < 8 {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Password must be at least 8 characters",
-			})
-		}
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(updateData.Password), bcrypt.DefaultCost)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to encrypt password",
-			})
-		}
-		updateData.Password = string(hashedPassword)
-	}
-
-	if err := database.DB.Model(&user).Updates(updateData).Error; err != nil {
+	// Update only phone number
+	if err := database.DB.Model(&user).Update("phone", updateData.Phone).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update user",
+			"error": "Failed to update user phone number",
 		})
 	}
 
@@ -123,7 +104,7 @@ func UpdateUserByID(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "User updated successfully",
+		"message": "User phone number updated successfully",
 		"status":  fiber.StatusOK,
 		"data":    user,
 	})
@@ -198,36 +179,15 @@ func DeleteUserByID(c *fiber.Ctx) error {
 	})
 }
 
-func Logout(c *fiber.Ctx) error {
-	// Clear the JWT token cookie
-	c.ClearCookie("jwt")
-
-	// Remove the token from the request context
-	c.Locals("user", nil)
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Logout successful", 
-		"status":  fiber.StatusOK,
-	})
-}
-
-
 func GetUserByID(c *fiber.Ctx) error {
 	id := c.Params("id")
-	idUint, err := strconv.ParseUint(id, 10, 32)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid user ID",
+	var user model.User
+	if err := database.DB.First(&user, id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "User not found",
 		})
 	}
 
-	var user model.User
-	if err := database.DB.First(&user, idUint).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "User not found",
-		})
-	}
-	
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "User fetched successfully",
 		"status":  fiber.StatusOK,
