@@ -128,6 +128,14 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
+	// Save token to database
+	user.Token = tokenString
+	if err := database.DB.Model(&user).Update("token", tokenString).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to save token to database",
+		})
+	}
+
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Login successful",
 		"status":  fiber.StatusOK,
@@ -143,6 +151,44 @@ func Logout(c *fiber.Ctx) error {
 	if authHeader == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "No token provided",
+		})
+	}
+
+	// Remove Bearer prefix
+	tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
+
+	// Parse and validate token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return []byte("bagus"), nil
+	})
+
+	if err != nil || !token.Valid {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid token",
+		})
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Invalid token claims",
+		})
+	}
+
+	userID := claims["id"].(float64)
+
+	// Find user and clear token in database
+	var user model.User
+	if err := database.DB.First(&user, uint(userID)).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to find user",
+		})
+	}
+
+	// Clear token in database
+	if err := database.DB.Model(&user).Update("token", "").Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to clear token in database",
 		})
 	}
 
