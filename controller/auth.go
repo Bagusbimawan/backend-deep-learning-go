@@ -128,9 +128,14 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	// Save token to database
+	// Save token and expiry time to database
+	tokenExpiry := time.Now().Add(time.Hour * 1)
 	user.Token = tokenString
-	if err := database.DB.Model(&user).Update("token", tokenString).Error; err != nil {
+	user.TokenExpiry = tokenExpiry
+	if err := database.DB.Model(&user).Updates(map[string]interface{}{
+		"token":        tokenString,
+		"token_expiry": tokenExpiry,
+	}).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to save token to database",
 		})
@@ -140,12 +145,10 @@ func Login(c *fiber.Ctx) error {
 		"message": "Login successful",
 		"status":  fiber.StatusOK,
 		"data":    user,
-		"token":   tokenString,
 	})
 }
 
 func Logout(c *fiber.Ctx) error {
-
 	// Get token from header
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
@@ -169,7 +172,7 @@ func Logout(c *fiber.Ctx) error {
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
+	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Invalid token claims",
 		})
@@ -177,16 +180,39 @@ func Logout(c *fiber.Ctx) error {
 
 	userID := claims["id"].(float64)
 
-	// Find user and clear token in database
+	// Find user and validate token
 	var user model.User
-	if err := database.DB.First(&user, uint(userID)).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to find user",
+	if err := database.DB.Where("id = ? AND token = ?", uint(userID), tokenString).First(&user).Error; err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid or expired token",
+		})
+	}
+
+	if time.Now().After(user.TokenExpiry) {
+		// Clear expired token
+		if err := database.DB.Model(&user).Updates(map[string]interface{}{
+			"token":        "",
+			"token_expiry": time.Time{},
+		}).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Failed to clear expired token",
+			})
+		}
+
+		// Clear cookie and header
+		c.ClearCookie("jwt")
+		c.Request().Header.Del("Authorization")
+
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Token has expired",
 		})
 	}
 
 	// Clear token in database
-	if err := database.DB.Model(&user).Update("token", "").Error; err != nil {
+	if err := database.DB.Model(&user).Updates(map[string]interface{}{
+		"token":        "",
+		"token_expiry": time.Time{},
+	}).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Failed to clear token in database",
 		})
